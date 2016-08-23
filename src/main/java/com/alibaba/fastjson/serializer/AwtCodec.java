@@ -17,6 +17,14 @@ import com.alibaba.fastjson.parser.deserializer.ObjectDeserializer;
 public class AwtCodec implements ObjectSerializer, ObjectDeserializer {
 
     public final static AwtCodec instance = new AwtCodec();
+    
+    public static boolean support(Class<?> clazz) {
+        return clazz == Point.class //
+               || clazz == Rectangle.class //
+               || clazz == Font.class //
+               || clazz == Color.class //
+        ;
+    }
 
     public void write(JSONSerializer serializer, Object object, Object fieldName, Type fieldType,
                       int features) throws IOException {
@@ -34,8 +42,8 @@ public class AwtCodec implements ObjectSerializer, ObjectDeserializer {
             
             sep = writeClassName(out, Point.class, sep);
             
-            out.writeFieldValue(sep, "x", font.getX());
-            out.writeFieldValue(',', "y", font.getY());
+            out.writeFieldValue(sep, "x", font.x);
+            out.writeFieldValue(',', "y", font.y);
         } else if (object instanceof Font) {
             Font font = (Font) object;
             
@@ -49,10 +57,10 @@ public class AwtCodec implements ObjectSerializer, ObjectDeserializer {
             
             sep = writeClassName(out, Rectangle.class, sep);
             
-            out.writeFieldValue(sep, "x", rectangle.getX());
-            out.writeFieldValue(',', "y", rectangle.getY());
-            out.writeFieldValue(',', "width", rectangle.getWidth());
-            out.writeFieldValue(',', "height", rectangle.getHeight());
+            out.writeFieldValue(sep, "x", rectangle.x);
+            out.writeFieldValue(',', "y", rectangle.y);
+            out.writeFieldValue(',', "width", rectangle.width);
+            out.writeFieldValue(',', "height", rectangle.height);
         } else if (object instanceof Color) {
             Color color = (Color) object;
             
@@ -234,8 +242,12 @@ public class AwtCodec implements ObjectSerializer, ObjectDeserializer {
             }
 
             int val;
-            if (lexer.token() == JSONToken.LITERAL_INT) {
+            int token = lexer.token();
+            if (token == JSONToken.LITERAL_INT) {
                 val = lexer.intValue();
+                lexer.nextToken();
+            } else if (token == JSONToken.LITERAL_FLOAT) {
+                val = (int) lexer.floatValue();
                 lexer.nextToken();
             } else {
                 throw new JSONException("syntax error");
@@ -285,9 +297,13 @@ public class AwtCodec implements ObjectSerializer, ObjectDeserializer {
                 throw new JSONException("syntax error");
             }
 
+            int token = lexer.token();
             int val;
-            if (lexer.token() == JSONToken.LITERAL_INT) {
+            if (token == JSONToken.LITERAL_INT) {
                 val = lexer.intValue();
+                lexer.nextToken();
+            } else if(token == JSONToken.LITERAL_FLOAT) {
+                val = (int) lexer.floatValue();
                 lexer.nextToken();
             } else {
                 throw new JSONException("syntax error : " + lexer.tokenName());

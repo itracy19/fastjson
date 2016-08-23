@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.alibaba.fastjson.JSONException;
 import com.alibaba.fastjson.parser.DefaultJSONParser;
+import com.alibaba.fastjson.serializer.BeanContext;
 import com.alibaba.fastjson.util.FieldInfo;
 
 public abstract class FieldDeserializer {
@@ -18,6 +19,8 @@ public abstract class FieldDeserializer {
     public final FieldInfo fieldInfo;
 
     protected final Class<?>  clazz;
+    
+    protected BeanContext    beanContext;
 
     public FieldDeserializer(Class<?> clazz, FieldInfo fieldInfo){
         this.clazz = clazz;
@@ -49,9 +52,14 @@ public abstract class FieldDeserializer {
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public void setValue(Object object, Object value) {
-        Method method = fieldInfo.method;
-        if (method != null) {
-            try {
+        if (value == null //
+            && fieldInfo.fieldClass.isPrimitive()) {
+            return;
+        }
+
+        try {
+            Method method = fieldInfo.method;
+            if (method != null) {
                 if (fieldInfo.getOnly) {
                     if (fieldInfo.fieldClass == AtomicInteger.class) {
                         AtomicInteger atomic = (AtomicInteger) method.invoke(object);
@@ -80,24 +88,47 @@ public abstract class FieldDeserializer {
                         }
                     }
                 } else {
-                    if (value == null && fieldInfo.fieldClass.isPrimitive()) {
-                        return;
-                    }
                     method.invoke(object, value);
                 }
-            } catch (Exception e) {
-                throw new JSONException("set property error, " + fieldInfo.name, e);
+                return;
+            } else {
+                final Field field = fieldInfo.field;
+                
+                if (fieldInfo.getOnly) {
+                    if (fieldInfo.fieldClass == AtomicInteger.class) {
+                        AtomicInteger atomic = (AtomicInteger) field.get(object);
+                        if (atomic != null) {
+                            atomic.set(((AtomicInteger) value).get());
+                        }
+                    } else if (fieldInfo.fieldClass == AtomicLong.class) {
+                        AtomicLong atomic = (AtomicLong) field.get(object);
+                        if (atomic != null) {
+                            atomic.set(((AtomicLong) value).get());
+                        }
+                    } else if (fieldInfo.fieldClass == AtomicBoolean.class) {
+                        AtomicBoolean atomic = (AtomicBoolean) field.get(object);
+                        if (atomic != null) {
+                            atomic.set(((AtomicBoolean) value).get());
+                        }
+                    } else if (Map.class.isAssignableFrom(fieldInfo.fieldClass)) {
+                        Map map = (Map) field.get(object);
+                        if (map != null) {
+                            map.putAll((Map) value);
+                        }
+                    } else {
+                        Collection collection = (Collection) field.get(object);
+                        if (collection != null) {
+                            collection.addAll((Collection) value);
+                        }
+                    }
+                } else {
+                    if (field != null) {
+                        field.set(object, value);
+                    }
+                }
             }
-            return;
-        }
-
-        final Field field = fieldInfo.field;
-        if (field != null) {
-            try {
-                field.set(object, value);
-            } catch (Exception e) {
-                throw new JSONException("set property error, " + fieldInfo.name, e);
-            }
+        } catch (Exception e) {
+            throw new JSONException("set property error, " + fieldInfo.name, e);
         }
     }
 }
